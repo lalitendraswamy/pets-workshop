@@ -1,6 +1,6 @@
 import os
 from typing import Dict, List, Any, Optional
-from flask import Flask, jsonify, Response
+from flask import Flask, jsonify, Response, request
 from models import init_db, db, Dog, Breed
 
 # Get the server directory path
@@ -15,24 +15,35 @@ init_db(app)
 
 @app.route('/api/dogs', methods=['GET'])
 def get_dogs() -> Response:
+    breed_id: Optional[int] = request.args.get('breed_id', type=int)
+    available: Optional[int] = request.args.get('available', type=int)
+
     query = db.session.query(
         Dog.id, 
         Dog.name, 
-        Breed.name.label('breed')
+        Breed.name.label('breed'),
+        Dog.status
     ).join(Breed, Dog.breed_id == Breed.id)
-    
+
+    if breed_id:
+        query = query.filter(Dog.breed_id == breed_id)
+    if available:
+        # Assuming status.name == 'Available' means available for adoption
+        from models import DogStatus
+        query = query.filter(Dog.status == DogStatus.AVAILABLE)
+
     dogs_query = query.all()
-    
-    # Convert the result to a list of dictionaries
+
     dogs_list: List[Dict[str, Any]] = [
         {
             'id': dog.id,
             'name': dog.name,
-            'breed': dog.breed
+            'breed': dog.breed,
+            'status': dog.status.name if hasattr(dog.status, 'name') else str(dog.status)
         }
         for dog in dogs_query
     ]
-    
+
     return jsonify(dogs_list)
 
 @app.route('/api/dogs/<int:id>', methods=['GET'])
@@ -65,7 +76,21 @@ def get_dog(id: int) -> tuple[Response, int] | Response:
     
     return jsonify(dog)
 
-## HERE
+@app.route('/api/breeds', methods=['GET'])
+def get_breeds():
+    # Query all breeds
+    breeds_query = db.session.query(Breed.id, Breed.name).all()
+    
+    # Convert the result to a list of dictionaries
+    breeds_list = [
+        {
+            'id': breed.id,
+            'name': breed.name
+        }
+        for breed in breeds_query
+    ]
+    
+    return jsonify(breeds_list)
 
 if __name__ == '__main__':
     app.run(debug=True, port=5100) # Port 5100 to avoid macOS conflicts

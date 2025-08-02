@@ -5,16 +5,42 @@
         id: number;
         name: string;
         breed: string;
+        status?: string;
+    }
+
+    interface Breed {
+        id: number;
+        name: string;
     }
 
     export let dogs: Dog[] = [];
+    let breeds: Breed[] = [];
+    let selectedBreed: number | null = null;
+    let onlyAvailable: boolean = false;
     let loading = true;
     let error: string | null = null;
 
+    const fetchBreeds = async () => {
+        try {
+            const response = await fetch('/api/breeds');
+            if (response.ok) {
+                breeds = await response.json();
+            }
+        } catch {
+            // ignore breed fetch errors for now
+        }
+    };
+
     const fetchDogs = async () => {
         loading = true;
+        error = null;
+        let url = '/api/dogs';
+        const params: string[] = [];
+        if (selectedBreed) params.push(`breed_id=${selectedBreed}`);
+        if (onlyAvailable) params.push('available=1');
+        if (params.length) url += '?' + params.join('&');
         try {
-            const response = await fetch('/api/dogs');
+            const response = await fetch(url);
             if(response.ok) {
                 dogs = await response.json();
             } else {
@@ -28,13 +54,40 @@
     };
 
     onMount(() => {
+        fetchBreeds();
         fetchDogs();
     });
+
+    $: selectedBreed, onlyAvailable, fetchDogs();
 </script>
 
 <div>
     <h2 class="text-2xl font-medium mb-6 text-slate-100">Available Dogs</h2>
-    
+    <div class="flex flex-wrap gap-4 mb-8 items-center">
+        <div>
+            <label class="text-slate-300 mr-2" for="breed-select">Breed:</label>
+            <select
+                id="breed-select"
+                class="bg-slate-800 text-slate-100 border border-slate-700 rounded px-3 py-2"
+                bind:value={selectedBreed}
+            >
+                <option value={null}>All Breeds</option>
+                {#each breeds as breed}
+                    <option value={breed.id}>{breed.name}</option>
+                {/each}
+            </select>
+        </div>
+        <div>
+            <label class="inline-flex items-center cursor-pointer">
+                <input
+                    type="checkbox"
+                    class="form-checkbox accent-blue-500 mr-2"
+                    bind:checked={onlyAvailable}
+                />
+                <span class="text-slate-300">Only show available for adoption</span>
+            </label>
+        </div>
+    </div>
     {#if loading}
         <!-- loading animation -->
         <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
